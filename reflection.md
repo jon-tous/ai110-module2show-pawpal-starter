@@ -65,6 +65,94 @@
       - (manage produced schedule entries and derive display text)
 
 
+**Mermaid class diagram**
+```mermaid
+classDiagram
+    class Owner {
+        +String name
+        +String contact_info
+        +Dict preferences
+        +List available_hours
+        +update_preferences()
+        +set_availability()
+        +get_daily_constraints()
+    }
+
+    class Pet {
+        +String name
+        +String species
+        +int age
+        +String health_notes
+        +List default_tasks
+        +update_profile()
+        +needs_today()
+        +is_high_priority()
+    }
+
+    class Task {
+        +String id
+        +String title
+        +String pet_id
+        +int duration
+        +int priority
+        +DateTime due_time
+        +String recurrence
+        +String status
+        +String notes
+        +mark_completed()
+        +reschedule(new_time)
+        +update_details()
+        +is_overdue()
+        +effective_score()
+    }
+
+    class TaskManager {
+        +List tasks
+        +List pets
+        +List owners
+        +add_task()
+        +edit_task()
+        +delete_task()
+        +get_tasks_by_day(date)
+        +get_tasks_by_pet(pet_id)
+        +get_pending_tasks()
+        +load()
+        +save()
+    }
+
+    class Scheduler {
+        +List agenda
+        +Dict constraints
+        +Dict settings
+        +generate_daily_plan(date)
+        +rank_tasks()
+        +fit_tasks_into_slots()
+        +explain_plan()
+        +adjust_plan()
+    }
+
+    class DailySchedule {
+        +Date date
+        +List slots
+        +int total_duration
+        +List unscheduled_tasks
+        +String reasoning
+        +add_slot(task, start_time)
+        +remove_slot(slot_id)
+        +get_today_tasks()
+        +get_unplanned_tasks()
+        +describe()
+    }
+
+    Owner "1" -- "*" Pet : owns
+    Pet "1" -- "*" Task : has
+    TaskManager "1" -- "*" Task : manages
+    TaskManager "1" -- "*" Pet : manages
+    TaskManager "1" -- "*" Owner : manages
+    Scheduler "1" -- "1" TaskManager : uses
+    Scheduler "1" -- "1" DailySchedule : outputs
+```
+
 **b. Design changes**
 
 - Did your design change during implementation?
