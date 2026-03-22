@@ -21,6 +21,8 @@ class Owner:
 
 @dataclass
 class Pet:
+    id: str
+    owner_id: str
     name: str
     species: str
     age: int
@@ -45,6 +47,7 @@ class Task:
     priority: int
     due_time: Optional[datetime] = None
     recurrence: Optional[str] = None
+    scheduled_date: Optional[date] = None
     status: str = "pending"
     notes: Optional[str] = None
 
@@ -62,6 +65,16 @@ class Task:
 
     def effective_score(self, now: Optional[datetime] = None) -> float:
         pass
+
+@dataclass
+class Slot:
+    id: str
+    task: Task
+    start_time: datetime
+    end_time: datetime
+
+    def duration(self) -> int:
+        return int((self.end_time - self.start_time).total_seconds() / 60)
 
 @dataclass
 class TaskManager:
@@ -96,18 +109,18 @@ class TaskManager:
 @dataclass
 class DailySchedule:
     date: date
-    slots: List[Dict[str, Any]] = field(default_factory=list)
+    slots: List[Slot] = field(default_factory=list)
     total_duration: int = 0
     unscheduled_tasks: List[Task] = field(default_factory=list)
     reasoning: Optional[str] = None
 
-    def add_slot(self, task: Task, start_time: datetime) -> None:
+    def add_slot(self, slot: Slot) -> None:
         pass
 
     def remove_slot(self, slot_id: str) -> None:
         pass
 
-    def get_today_tasks(self) -> List[Dict[str, Any]]:
+    def get_today_tasks(self) -> List[Slot]:
         pass
 
     def get_unplanned_tasks(self) -> List[Task]:

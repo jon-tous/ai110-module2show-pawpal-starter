@@ -79,6 +79,7 @@ classDiagram
     }
 
     class Pet {
+        +String owner_id
         +String name
         +String species
         +int age
@@ -96,6 +97,7 @@ classDiagram
         +int duration
         +int priority
         +DateTime due_time
+        +Date scheduled_date
         +String recurrence
         +String status
         +String notes
@@ -104,6 +106,14 @@ classDiagram
         +update_details()
         +is_overdue()
         +effective_score()
+    }
+
+    class Slot {
+        +String id
+        +Task task
+        +DateTime start_time
+        +DateTime end_time
+        +duration()
     }
 
     class TaskManager {
@@ -151,12 +161,22 @@ classDiagram
     TaskManager "1" -- "*" Owner : manages
     Scheduler "1" -- "1" TaskManager : uses
     Scheduler "1" -- "1" DailySchedule : outputs
+    DailySchedule "1" -- "*" Slot : contains
 ```
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+- Added owner_id to Pet
+    - Reason: Enforces the Owner 1-* Pet relationship from the diagram; avoids orphan pets in logic and supports per-owner task filtering.
+- Added scheduled_date to Task
+    - Reason: TaskManager.get_tasks_by_day() now has a concrete way to filter tasks. Without this, “by-day” queries are ambiguous and would require separate “due_time” treatment.
+- Added Slot dataclass and switched DailySchedule.slots to List[Slot]
+    - Reason: Makes schedule slot structure explicit; improves type safety and aligns with the idea of timetable entries, rather than opaque dicts.
+- Updated DailySchedule.add_slot() signature to take Slot
+    - Reason: Avoids stale code path mismatch (task+start_time vs structured slot object), and future-proofs schedule manipulation.
 
 ---
 
