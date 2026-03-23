@@ -75,6 +75,16 @@ manager.add_task(
 )
 manager.add_task(
     Task(
+        id="task5",
+        title="Breakfast",
+        pet_id="pet2",
+        duration=10,
+        priority=6,
+        due_time=now + timedelta(hours=2),
+    )
+)
+manager.add_task(
+    Task(
         id="task2",
         title="Give Medication",
         pet_id="pet2",
@@ -114,3 +124,8 @@ plan = scheduler.generate_daily_plan(manager, date.today())
 # print schedule
 print("Today's Schedule")
 print(plan.describe())
+
+if plan.warnings:
+    print("Conflict warnings:")
+    for warning in plan.warnings:
+        print(f"- {warning}")

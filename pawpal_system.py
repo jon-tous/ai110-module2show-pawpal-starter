@@ -198,6 +198,7 @@ class DailySchedule:
     slots: List[Slot] = field(default_factory=list)
     total_duration: int = 0
     unscheduled_tasks: List[Task] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
     reasoning: Optional[str] = None
 
     def add_slot(self, slot: Slot) -> None:
@@ -218,6 +219,10 @@ class DailySchedule:
         """Return tasks that could not be scheduled."""
         return self.unscheduled_tasks
 
+    def add_warning(self, warning: str) -> None:
+        """Store a non-fatal warning about the generated plan."""
+        self.warnings.append(warning)
+
     def describe(self) -> str:
         """Build a readable summary of the daily schedule."""
         lines = [
@@ -229,6 +234,8 @@ class DailySchedule:
                 f"- {slot.task.title} ({slot.duration()} min) at "
                 f"{slot.start_time.time()} to {slot.end_time.time()}"
             )
+        for warning in self.warnings:
+            lines.append(f"Warning: {warning}")
         if self.reasoning:
             lines.append(f"Reasoning: {self.reasoning}")
         return "\n".join(lines)
@@ -252,6 +259,12 @@ class Scheduler:
 
         ranked_tasks = self.rank_tasks(available_tasks)
         plan = self.fit_tasks_into_slots(ranked_tasks, target_date)
+        warnings = self.detect_time_conflicts(
+            task_manager,
+            available_tasks,
+        )
+        for warning in warnings:
+            plan.add_warning(warning)
         plan.reasoning = self.explain_plan()
         self.agenda = plan
         return plan
@@ -327,6 +340,38 @@ class Scheduler:
         )
         task_manager.add_task(new_task)
         return new_task
+
+    def detect_time_conflicts(
+        self, task_manager: TaskManager, tasks: List[Task]
+    ) -> List[str]:
+        """Return warnings for tasks that share the same due time."""
+        pet_names = {pet.id: pet.name for pet in task_manager.pets}
+        tasks_by_due_time: Dict[datetime, List[Task]] = {}
+
+        for task in tasks:
+            if task.due_time is None:
+                continue
+            tasks_by_due_time.setdefault(task.due_time, []).append(task)
+
+        warnings = []
+        for due_time in sorted(tasks_by_due_time):
+            conflicting_tasks = tasks_by_due_time[due_time]
+            if len(conflicting_tasks) < 2:
+                continue
+
+            task_descriptions = ", ".join(
+                (
+                    f"{task.title} ({pet_names.get(task.pet_id, task.pet_id)})"
+                    for task in conflicting_tasks
+                )
+            )
+            warnings.append(
+                "Tasks share the same due time "
+                f"{due_time.strftime('%Y-%m-%d %H:%M')}: "
+                f"{task_descriptions}"
+            )
+
+        return warnings
 
     def _next_task_instance_id(
         self, task_manager: TaskManager, task_id: str

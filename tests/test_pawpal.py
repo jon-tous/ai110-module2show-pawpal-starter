@@ -275,3 +275,55 @@ def test_scheduler_complete_task_does_not_clone_non_recurring_task():
     assert one_time_task.status == "completed"
     assert new_task is None
     assert len(manager.tasks) == 1
+
+
+def test_scheduler_generate_daily_plan_adds_conflict_warning():
+    manager = TaskManager()
+    manager.add_pet(
+        Pet(
+            id="pet1",
+            owner_id="owner1",
+            name="Bella",
+            species="Dog",
+            age=4,
+        )
+    )
+    manager.add_pet(
+        Pet(
+            id="pet2",
+            owner_id="owner1",
+            name="Milo",
+            species="Cat",
+            age=2,
+        )
+    )
+
+    shared_due_time = datetime(2026, 3, 22, 9, 0)
+    manager.add_task(
+        Task(
+            id="task1",
+            title="Morning Walk",
+            pet_id="pet1",
+            duration=30,
+            priority=4,
+            due_time=shared_due_time,
+        )
+    )
+    manager.add_task(
+        Task(
+            id="task2",
+            title="Breakfast",
+            pet_id="pet2",
+            duration=15,
+            priority=3,
+            due_time=shared_due_time,
+        )
+    )
+
+    scheduler = Scheduler(constraints={"max_minutes": 120})
+    plan = scheduler.generate_daily_plan(manager, date(2026, 3, 22))
+
+    assert len(plan.warnings) == 1
+    assert "Tasks share the same due time" in plan.warnings[0]
+    assert "Morning Walk (Bella)" in plan.warnings[0]
+    assert "Breakfast (Milo)" in plan.warnings[0]
