@@ -221,10 +221,14 @@ That removes duplicated “how tasks are ordered” logic.
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
 
+I mostly used GitHub Copilot agent mode. I started out guiding it more specifically, but as it gained more of a foundational context in the project I found I was able to give it pretty much the raw project spec from the course portal and got good results.
+
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
+
+I noticed an edge case that stemmed from the test logic relying on a date calculation falling on the current date, which resulted in a non-deterministic test result depending on the time of day you're running the test. Out of curiosity, I just told the AI that the test failed (I was running it in the evening) and was glad to see the AI then caught the same issue.
 
 ---
 
@@ -232,13 +236,62 @@ That removes duplicated “how tasks are ordered” logic.
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+The suite covers five behavioral categories across 20 tests:
+
+**Domain model correctness**
+- Owner preferences are stored and returned correctly by `get_daily_constraints()`.
+- Pet urgency detection (`is_high_priority()`) reflects changes to `health_notes`.
+- Task lifecycle: `mark_completed()` changes status; `reschedule()` updates both `due_time` and `scheduled_date`; `is_overdue()` correctly ignores completed tasks.
+- `effective_score()` produces a higher value for tasks due soon than for identical tasks due hours later.
+
+These are important because all scheduling decisions depend on these properties being correct. A wrong score or a missed status change would silently corrupt the plan without obvious symptoms.
+
+**Task manager CRUD and queries**
+- Adding a duplicate task or owner raises `ValueError`.
+- `get_tasks_by_day()` matches on both `scheduled_date` and `due_time.date()`.
+- `edit_task()` mutates in place; `delete_task()` removes only the target.
+
+These guard the fundamental data integrity that every other part of the system relies on.
+
+**Sorting contracts**
+- `sort_tasks_by_time()` places undated tasks last, and respects chronological order even when a later task has higher priority (due-time wins over priority in this view).
+- `rank_tasks()` surfaces the highest effective score first, using due time only as a tie-breaker.
+
+Two separate sorting methods serve two distinct use cases in the UI. Testing them independently prevents the methods from silently drifting into the same behavior.
+
+**Scheduling constraints and packing**
+- `generate_daily_plan()` with `max_minutes=120` schedules exactly the tasks that fit and puts the rest in `unscheduled_tasks`.
+- A task whose duration exactly equals the remaining budget is scheduled (boundary test).
+- When no tasks are due on the target date, the planner falls back to all pending tasks rather than producing an empty plan.
+
+The boundary test and fallback test are important because off-by-one errors in the budget check and empty-day behavior are easy to introduce and hard to notice without an explicit assertion.
+
+**Recurring task automation**
+- Completing a `daily` task creates a new task due exactly one day later with a `-r1` suffix.
+- Completing a `weekly` task creates one due seven days later with the correct `scheduled_date`.
+- Completing a one-time task returns `None` and does not add a new task.
+- Completing a recurring task that has no `due_time` uses `completed_at` as the base time.
+- If `-r1` already exists, the new id increments to `-r2`.
+- Completing a non-existent task id raises `ValueError`.
+
+Recurrence is the highest-risk feature because silent failures (wrong date, duplicate id, phantom task creation) would be invisible until the owner noticed a missing or duplicated care event.
+
+**Conflict detection**
+- Two tasks with the same due time produce exactly one warning containing both task names and pet names.
+- The warning is attached to the plan non-fatally so the schedule is still usable.
+
+This tests that the planner stays operational under bad input — a critical property for a real-world care tool.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+**4 out of 5 stars.**
+
+All 20 tests pass and they cover the most important scheduler behaviors including all recurrence paths, sorting contracts, packing limits, conflict warnings, and error handling. Confidence is not 5/5 because:
+- Integration between the Streamlit UI and the backend is not tested; bugs in state management (e.g., session state getting stale after completion) would not be caught.
+- There are no property-based or randomized tests for the scoring formula, so unexpected score interactions at extreme priority or urgency values are untested.
+- Edge cases like zero-duration tasks, negative priority, or simultaneous completion of the same recurring task are not covered.
+
+If more time were available, the next tests would cover: filtering by a pet name that does not exist (should return empty, not all tasks), repeated completion of a recurring task (should not generate duplicate future tasks), and the conflict detection case with three or more tasks sharing a due time.
 
 ---
 
@@ -248,10 +301,16 @@ That removes duplicated “how tasks are ordered” logic.
 
 - What part of this project are you most satisfied with?
 
+I liked the practice of pairing with AI to work through design, implementation, testing, and refining a solution. It was interesting to experiment with clearing the context/using separate agents for each piece of that process.
+
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
 
+I would improve the UI (e.g., allow row-level actions within the table view itself) and do more realistic end-to-end testing.
+
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+
+This exercise reinforced my belief in AI to handle the implementation so long as you steer them intentionally. I see the value of validating the business logic and core system with tests before hooking it up to a frontend.
