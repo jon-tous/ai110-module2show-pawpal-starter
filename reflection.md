@@ -73,20 +73,21 @@ classDiagram
         +String contact_info
         +Dict preferences
         +List available_hours
-        +update_preferences()
-        +set_availability()
-        +get_daily_constraints()
+        +update_preferences(preferences)
+        +set_availability(availability)
+        +get_daily_constraints(target_date)
     }
 
     class Pet {
+        +String id
         +String owner_id
         +String name
         +String species
         +int age
         +String health_notes
         +List default_tasks
-        +update_profile()
-        +needs_today()
+        +update_profile(**kwargs)
+        +needs_today(target_date)
         +is_high_priority()
     }
 
@@ -97,15 +98,16 @@ classDiagram
         +int duration
         +int priority
         +DateTime due_time
-        +Date scheduled_date
         +String recurrence
+        +Date scheduled_date
         +String status
         +String notes
         +mark_completed()
         +reschedule(new_time)
-        +update_details()
-        +is_overdue()
-        +effective_score()
+        +update_details(**kwargs)
+        +is_overdue(reference)
+        +effective_score(now)
+        +next_occurrence_time(completed_at)
     }
 
     class Slot {
@@ -120,25 +122,31 @@ classDiagram
         +List tasks
         +List pets
         +List owners
-        +add_task()
-        +edit_task()
-        +delete_task()
-        +get_tasks_by_day(date)
+        +add_owner(owner)
+        +add_pet(pet)
+        +add_task(task)
+        +edit_task(task_id, **updates)
+        +delete_task(task_id)
+        +get_tasks_by_day(target_date)
         +get_tasks_by_pet(pet_id)
         +get_pending_tasks()
-        +load()
+        +load(data)
         +save()
     }
 
     class Scheduler {
-        +List agenda
+        +DailySchedule agenda
         +Dict constraints
         +Dict settings
-        +generate_daily_plan(date)
-        +rank_tasks()
-        +fit_tasks_into_slots()
+        +generate_daily_plan(task_manager, target_date)
+        +rank_tasks(tasks)
+        +sort_tasks_by_time(tasks)
+        +filter_tasks(task_manager, status, pet_name)
+        +complete_task(task_manager, task_id, completed_at)
+        +detect_time_conflicts(task_manager, tasks)
+        +fit_tasks_into_slots(tasks, target_date)
         +explain_plan()
-        +adjust_plan()
+        +adjust_plan(plan, updates)
     }
 
     class DailySchedule {
@@ -146,11 +154,13 @@ classDiagram
         +List slots
         +int total_duration
         +List unscheduled_tasks
+        +List warnings
         +String reasoning
-        +add_slot(task, start_time)
+        +add_slot(slot)
         +remove_slot(slot_id)
         +get_today_tasks()
         +get_unplanned_tasks()
+        +add_warning(warning)
         +describe()
     }
 
@@ -191,6 +201,16 @@ classDiagram
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+
+Merge rank_tasks and sort_tasks_by_time into one ordering rule in pawpal_system.py:272
+
+We currently have two separate sorting methods.
+If the real scheduling behavior is “highest score first, earlier due time as tie-breaker,” then one sort is easier to reason about than two utilities.
+Example rule:
+sort by negative effective score
+then by whether due_time is missing
+then by due_time
+That removes duplicated “how tasks are ordered” logic.
 
 ---
 
