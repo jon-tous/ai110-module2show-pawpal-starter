@@ -116,6 +116,18 @@ class TaskManager:
     pets: List[Pet] = field(default_factory=list)
     owners: List[Owner] = field(default_factory=list)
 
+    def add_owner(self, owner: Owner) -> None:
+        """Add an owner if an equivalent record does not already exist."""
+        if any(existing.name == owner.name for existing in self.owners):
+            raise ValueError(f"Owner named '{owner.name}' already exists")
+        self.owners.append(owner)
+
+    def add_pet(self, pet: Pet) -> None:
+        """Add a pet if its identifier is unique."""
+        if any(existing.id == pet.id for existing in self.pets):
+            raise ValueError(f"Pet with id '{pet.id}' already exists")
+        self.pets.append(pet)
+
     def add_task(self, task: Task) -> None:
         """Add a task if its identifier is unique."""
         if any(existing.id == task.id for existing in self.tasks):
