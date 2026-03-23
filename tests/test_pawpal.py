@@ -89,13 +89,44 @@ def test_task_manager_crud_and_queries():
 
 def test_scheduler_plans_today_and_respects_max_minutes():
     manager = TaskManager()
-    now = datetime.now()
-    manager.add_task(Task(id="t1", title="Walk", pet_id="pet1", duration=60, priority=5, due_time=now + timedelta(hours=1)))
-    manager.add_task(Task(id="t2", title="Feed", pet_id="pet1", duration=60, priority=4, due_time=now + timedelta(hours=2)))
-    manager.add_task(Task(id="t3", title="Groom", pet_id="pet1", duration=90, priority=3, due_time=now + timedelta(hours=3)))
+    target_date = date.today()
+    morning = datetime.combine(target_date, datetime.min.time()).replace(
+        hour=9,
+        minute=0,
+    )
+    manager.add_task(
+        Task(
+            id="t1",
+            title="Walk",
+            pet_id="pet1",
+            duration=60,
+            priority=5,
+            due_time=morning + timedelta(hours=1),
+        )
+    )
+    manager.add_task(
+        Task(
+            id="t2",
+            title="Feed",
+            pet_id="pet1",
+            duration=60,
+            priority=4,
+            due_time=morning + timedelta(hours=2),
+        )
+    )
+    manager.add_task(
+        Task(
+            id="t3",
+            title="Groom",
+            pet_id="pet1",
+            duration=90,
+            priority=3,
+            due_time=morning + timedelta(hours=3),
+        )
+    )
 
     scheduler = Scheduler(constraints={"max_minutes": 120})
-    plan = scheduler.generate_daily_plan(manager, date.today())
+    plan = scheduler.generate_daily_plan(manager, target_date)
 
     assert isinstance(plan, DailySchedule)
     assert len(plan.slots) == 2
@@ -327,3 +358,155 @@ def test_scheduler_generate_daily_plan_adds_conflict_warning():
     assert "Tasks share the same due time" in plan.warnings[0]
     assert "Morning Walk (Bella)" in plan.warnings[0]
     assert "Breakfast (Milo)" in plan.warnings[0]
+
+
+def test_scheduler_generate_daily_plan_falls_back_to_pending_tasks():
+    manager = TaskManager()
+    manager.add_task(
+        Task(
+            id="future-task",
+            title="Future Walk",
+            pet_id="pet1",
+            duration=30,
+            priority=4,
+            due_time=datetime(2026, 3, 25, 9, 0),
+        )
+    )
+    manager.add_task(
+        Task(
+            id="undated-task",
+            title="Enrichment",
+            pet_id="pet1",
+            duration=20,
+            priority=2,
+        )
+    )
+
+    scheduler = Scheduler(constraints={"max_minutes": 120})
+    plan = scheduler.generate_daily_plan(manager, date(2026, 3, 22))
+
+    assert [slot.task.id for slot in plan.slots] == [
+        "future-task",
+        "undated-task",
+    ]
+    assert plan.unscheduled_tasks == []
+
+
+def test_scheduler_fit_tasks_into_slots_allows_exact_max_minutes_boundary():
+    scheduler = Scheduler(constraints={"max_minutes": 60})
+    tasks = [
+        Task(id="t1", title="Walk", pet_id="pet1", duration=20, priority=3),
+        Task(id="t2", title="Feed", pet_id="pet1", duration=40, priority=2),
+    ]
+
+    plan = scheduler.fit_tasks_into_slots(tasks, date(2026, 3, 22))
+
+    assert [slot.task.id for slot in plan.slots] == ["t1", "t2"]
+    assert plan.total_duration == 60
+    assert plan.unscheduled_tasks == []
+
+
+def test_scheduler_sort_tasks_by_time_orders_by_due_time_before_priority():
+    scheduler = Scheduler()
+    tasks = [
+        Task(
+            id="higher-priority-later",
+            title="Later Medication",
+            pet_id="pet1",
+            duration=15,
+            priority=5,
+            due_time=datetime(2026, 3, 22, 10, 0),
+        ),
+        Task(
+            id="lower-priority-earlier",
+            title="Earlier Breakfast",
+            pet_id="pet1",
+            duration=15,
+            priority=1,
+            due_time=datetime(2026, 3, 22, 9, 0),
+        ),
+        Task(
+            id="undated",
+            title="Anytime Enrichment",
+            pet_id="pet1",
+            duration=10,
+            priority=10,
+        ),
+    ]
+
+    sorted_tasks = scheduler.sort_tasks_by_time(tasks)
+
+    assert [task.id for task in sorted_tasks] == [
+        "lower-priority-earlier",
+        "higher-priority-later",
+        "undated",
+    ]
+
+
+def test_scheduler_complete_task_without_due_time_uses_completed_at():
+    manager = TaskManager()
+    scheduler = Scheduler()
+    recurring_task = Task(
+        id="daily-checkin",
+        title="Daily Check-in",
+        pet_id="pet1",
+        duration=10,
+        priority=2,
+        recurrence="daily",
+    )
+    manager.add_task(recurring_task)
+
+    new_task = scheduler.complete_task(
+        manager,
+        "daily-checkin",
+        completed_at=datetime(2026, 3, 22, 14, 30),
+    )
+
+    assert new_task is not None
+    assert new_task.due_time == datetime(2026, 3, 23, 14, 30)
+    assert new_task.scheduled_date == date(2026, 3, 23)
+
+
+def test_scheduler_complete_task_skips_existing_recurring_id_suffixes():
+    manager = TaskManager()
+    scheduler = Scheduler()
+    recurring_task = Task(
+        id="daily-walk",
+        title="Daily Walk",
+        pet_id="pet1",
+        duration=30,
+        priority=4,
+        due_time=datetime(2026, 3, 22, 9, 0),
+        recurrence="daily",
+    )
+    existing_clone = Task(
+        id="daily-walk-r1",
+        title="Existing Next Walk",
+        pet_id="pet1",
+        duration=30,
+        priority=4,
+        due_time=datetime(2026, 3, 23, 9, 0),
+        recurrence="daily",
+    )
+    manager.add_task(recurring_task)
+    manager.add_task(existing_clone)
+
+    new_task = scheduler.complete_task(
+        manager,
+        "daily-walk",
+        completed_at=datetime(2026, 3, 22, 9, 15),
+    )
+
+    assert new_task is not None
+    assert new_task.id == "daily-walk-r2"
+
+
+def test_scheduler_complete_task_raises_for_missing_task_id():
+    scheduler = Scheduler()
+    manager = TaskManager()
+
+    with pytest.raises(
+        ValueError,
+        match="Task with id 'missing-task' not found",
+    ):
+        scheduler.complete_task(manager, "missing-task")

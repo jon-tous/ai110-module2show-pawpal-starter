@@ -271,7 +271,7 @@ class Scheduler:
 
     def rank_tasks(self, tasks: List[Task]) -> List[Task]:
         """Sort tasks by effective score, with due time as tie-breaker.
-        
+
         Primary sort: highest effective score first (descending).
         Tie-breaker 1: tasks with due times before undated tasks.
         Tie-breaker 2: earlier due times first (ascending).
@@ -287,10 +287,17 @@ class Scheduler:
 
     def sort_tasks_by_time(self, tasks: List[Task]) -> List[Task]:
         """Sort tasks by due time, placing undated tasks last.
-        
-        Convenience method; delegates to rank_tasks with full ordering.
+
+        For time-based views, due time takes precedence over priority.
         """
-        return self.rank_tasks(tasks)
+        return sorted(
+            tasks,
+            key=lambda t: (
+                t.due_time is None,
+                t.due_time,
+                -t.effective_score(),
+            ),
+        )
 
     def filter_tasks(
         self,
