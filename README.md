@@ -1,5 +1,7 @@
 # PawPal+ (Module 2 Project)
 
+<img src="https://github.com/jon-tous/ai110-module2show-pawpal-starter/blob/main/pawpal_screenshot.png" width=1000>
+
 You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
 
 ## Scenario
