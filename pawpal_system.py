@@ -97,6 +97,18 @@ class Task:
             return base + urgency
         return float(base)
 
+    def next_occurrence_time(
+        self, completed_at: Optional[datetime] = None
+    ) -> Optional[datetime]:
+        """Return the due time for the next recurring occurrence."""
+        if self.recurrence not in {"daily", "weekly"}:
+            return None
+
+        completed_at = completed_at or datetime.now()
+        interval = timedelta(days=1 if self.recurrence == "daily" else 7)
+        base_time = self.due_time or completed_at
+        return base_time + interval
+
 
 @dataclass
 class Slot:
@@ -280,6 +292,53 @@ class Scheduler:
             filtered_tasks.append(task)
 
         return filtered_tasks
+
+    def complete_task(
+        self,
+        task_manager: TaskManager,
+        task_id: str,
+        completed_at: Optional[datetime] = None,
+    ) -> Optional[Task]:
+        """Complete a task and create the next recurring instance if needed."""
+        task = next(
+            (item for item in task_manager.tasks if item.id == task_id),
+            None,
+        )
+        if task is None:
+            raise ValueError(f"Task with id '{task_id}' not found")
+
+        completed_at = completed_at or datetime.now()
+        task.mark_completed()
+
+        next_due_time = task.next_occurrence_time(completed_at=completed_at)
+        if next_due_time is None:
+            return None
+
+        new_task = Task(
+            id=self._next_task_instance_id(task_manager, task.id),
+            title=task.title,
+            pet_id=task.pet_id,
+            duration=task.duration,
+            priority=task.priority,
+            due_time=next_due_time,
+            recurrence=task.recurrence,
+            scheduled_date=next_due_time.date(),
+            notes=task.notes,
+        )
+        task_manager.add_task(new_task)
+        return new_task
+
+    def _next_task_instance_id(
+        self, task_manager: TaskManager, task_id: str
+    ) -> str:
+        """Generate a unique id for the next occurrence of a task."""
+        suffix = 1
+        candidate = f"{task_id}-r{suffix}"
+        existing_ids = {task.id for task in task_manager.tasks}
+        while candidate in existing_ids:
+            suffix += 1
+            candidate = f"{task_id}-r{suffix}"
+        return candidate
 
     def fit_tasks_into_slots(
         self, tasks: List[Task], target_date: date

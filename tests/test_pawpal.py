@@ -201,3 +201,77 @@ def test_scheduler_filter_tasks_by_status_and_pet_name():
 
     assert [task.id for task in completed_for_bella] == ["t1"]
     assert [task.id for task in pending_for_bella] == ["t2"]
+
+
+def test_scheduler_complete_task_creates_next_daily_occurrence():
+    manager = TaskManager()
+    scheduler = Scheduler()
+    due_time = datetime(2026, 3, 22, 9, 0)
+    recurring_task = Task(
+        id="daily-walk",
+        title="Daily Walk",
+        pet_id="pet1",
+        duration=30,
+        priority=4,
+        due_time=due_time,
+        recurrence="daily",
+    )
+    manager.add_task(recurring_task)
+
+    new_task = scheduler.complete_task(
+        manager,
+        "daily-walk",
+        completed_at=datetime(2026, 3, 22, 9, 15),
+    )
+
+    assert recurring_task.status == "completed"
+    assert new_task is not None
+    assert new_task.id == "daily-walk-r1"
+    assert new_task.status == "pending"
+    assert new_task.recurrence == "daily"
+    assert new_task.due_time == datetime(2026, 3, 23, 9, 0)
+
+
+def test_scheduler_complete_task_creates_next_weekly_occurrence():
+    manager = TaskManager()
+    scheduler = Scheduler()
+    recurring_task = Task(
+        id="weekly-groom",
+        title="Weekly Grooming",
+        pet_id="pet1",
+        duration=45,
+        priority=3,
+        due_time=datetime(2026, 3, 22, 18, 0),
+        recurrence="weekly",
+    )
+    manager.add_task(recurring_task)
+
+    new_task = scheduler.complete_task(
+        manager,
+        "weekly-groom",
+        completed_at=datetime(2026, 3, 22, 18, 30),
+    )
+
+    assert new_task is not None
+    assert new_task.id == "weekly-groom-r1"
+    assert new_task.due_time == datetime(2026, 3, 29, 18, 0)
+    assert new_task.scheduled_date == date(2026, 3, 29)
+
+
+def test_scheduler_complete_task_does_not_clone_non_recurring_task():
+    manager = TaskManager()
+    scheduler = Scheduler()
+    one_time_task = Task(
+        id="one-time-feed",
+        title="Feed",
+        pet_id="pet1",
+        duration=15,
+        priority=2,
+    )
+    manager.add_task(one_time_task)
+
+    new_task = scheduler.complete_task(manager, "one-time-feed")
+
+    assert one_time_task.status == "completed"
+    assert new_task is None
+    assert len(manager.tasks) == 1
