@@ -257,8 +257,8 @@ class Scheduler:
         if not available_tasks:
             available_tasks = task_manager.get_pending_tasks()
 
-        ranked_tasks = self.rank_tasks(available_tasks)
-        plan = self.fit_tasks_into_slots(ranked_tasks, target_date)
+        ordered_tasks = self.rank_tasks(available_tasks)
+        plan = self.fit_tasks_into_slots(ordered_tasks, target_date)
         warnings = self.detect_time_conflicts(
             task_manager,
             available_tasks,
@@ -270,15 +270,27 @@ class Scheduler:
         return plan
 
     def rank_tasks(self, tasks: List[Task]) -> List[Task]:
-        """Sort tasks from highest to lowest effective score."""
-        return sorted(tasks, key=lambda t: t.effective_score(), reverse=True)
-
-    def sort_tasks_by_time(self, tasks: List[Task]) -> List[Task]:
-        """Sort tasks by due time, placing undated tasks last."""
+        """Sort tasks by effective score, with due time as tie-breaker.
+        
+        Primary sort: highest effective score first (descending).
+        Tie-breaker 1: tasks with due times before undated tasks.
+        Tie-breaker 2: earlier due times first (ascending).
+        """
         return sorted(
             tasks,
-            key=lambda task: (task.due_time is None, task.due_time),
+            key=lambda t: (
+                -t.effective_score(),
+                t.due_time is None,
+                t.due_time,
+            ),
         )
+
+    def sort_tasks_by_time(self, tasks: List[Task]) -> List[Task]:
+        """Sort tasks by due time, placing undated tasks last.
+        
+        Convenience method; delegates to rank_tasks with full ordering.
+        """
+        return self.rank_tasks(tasks)
 
     def filter_tasks(
         self,

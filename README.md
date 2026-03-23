@@ -22,6 +22,16 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+The scheduler includes several intelligent features to optimize pet care planning:
+
+- **Unified Task Ordering**: Tasks are ranked by effective score (priority + urgency), with due-time tie-breaking to surface time-sensitive tasks first.
+- **Flexible Filtering**: Filter tasks by completion status, pet name, or both for focused views.
+- **Recurring Task Automation**: Daily and weekly tasks automatically create the next occurrence when marked complete, ensuring consistent care routines.
+- **Conflict Detection**: The scheduler detects when multiple tasks are scheduled at the same time and warns the owner without crashing, allowing for manual resolution.
+- **Non-Fatal Warnings**: Scheduling issues surface as warnings attached to the plan, keeping the app functional while alerting users to conflicts or constraints.
+
 ## Getting started
 
 ### Setup
