@@ -248,6 +248,39 @@ class Scheduler:
         """Sort tasks from highest to lowest effective score."""
         return sorted(tasks, key=lambda t: t.effective_score(), reverse=True)
 
+    def sort_tasks_by_time(self, tasks: List[Task]) -> List[Task]:
+        """Sort tasks by due time, placing undated tasks last."""
+        return sorted(
+            tasks,
+            key=lambda task: (task.due_time is None, task.due_time),
+        )
+
+    def filter_tasks(
+        self,
+        task_manager: TaskManager,
+        status: Optional[str] = None,
+        pet_name: Optional[str] = None,
+    ) -> List[Task]:
+        """Filter tasks by completion status, pet name, or both."""
+        pet_ids = None
+        if pet_name is not None:
+            pet_name_lower = pet_name.lower()
+            pet_ids = {
+                pet.id
+                for pet in task_manager.pets
+                if pet.name.lower() == pet_name_lower
+            }
+
+        filtered_tasks = []
+        for task in task_manager.tasks:
+            if status is not None and task.status != status:
+                continue
+            if pet_ids is not None and task.pet_id not in pet_ids:
+                continue
+            filtered_tasks.append(task)
+
+        return filtered_tasks
+
     def fit_tasks_into_slots(
         self, tasks: List[Task], target_date: date
     ) -> DailySchedule:

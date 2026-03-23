@@ -102,3 +102,102 @@ def test_scheduler_plans_today_and_respects_max_minutes():
     assert any(slot.task.id == "t1" for slot in plan.slots)
     assert any(slot.task.id == "t2" for slot in plan.slots)
     assert any(task.id == "t3" for task in plan.unscheduled_tasks)
+
+
+def test_scheduler_sort_tasks_by_time_places_undated_tasks_last():
+    scheduler = Scheduler()
+    now = datetime.now()
+    tasks = [
+        Task(
+            id="t3",
+            title="Anytime enrichment",
+            pet_id="pet1",
+            duration=15,
+            priority=1,
+        ),
+        Task(
+            id="t2",
+            title="Medication",
+            pet_id="pet1",
+            duration=10,
+            priority=3,
+            due_time=now + timedelta(hours=1),
+        ),
+        Task(
+            id="t1",
+            title="Breakfast",
+            pet_id="pet1",
+            duration=20,
+            priority=2,
+            due_time=now + timedelta(minutes=30),
+        ),
+    ]
+
+    sorted_tasks = scheduler.sort_tasks_by_time(tasks)
+
+    assert [task.id for task in sorted_tasks] == ["t1", "t2", "t3"]
+
+
+def test_scheduler_filter_tasks_by_status_and_pet_name():
+    manager = TaskManager()
+    manager.add_pet(
+        Pet(
+            id="pet1",
+            owner_id="owner1",
+            name="Bella",
+            species="Dog",
+            age=4,
+        )
+    )
+    manager.add_pet(
+        Pet(
+            id="pet2",
+            owner_id="owner1",
+            name="Milo",
+            species="Cat",
+            age=2,
+        )
+    )
+
+    completed_task = Task(
+        id="t1",
+        title="Morning Walk",
+        pet_id="pet1",
+        duration=30,
+        priority=3,
+        status="completed",
+    )
+    pending_task = Task(
+        id="t2",
+        title="Dinner",
+        pet_id="pet1",
+        duration=15,
+        priority=2,
+    )
+    other_pet_task = Task(
+        id="t3",
+        title="Medication",
+        pet_id="pet2",
+        duration=10,
+        priority=5,
+    )
+
+    manager.add_task(completed_task)
+    manager.add_task(pending_task)
+    manager.add_task(other_pet_task)
+
+    scheduler = Scheduler()
+
+    completed_for_bella = scheduler.filter_tasks(
+        manager,
+        status="completed",
+        pet_name="Bella",
+    )
+    pending_for_bella = scheduler.filter_tasks(
+        manager,
+        status="pending",
+        pet_name="bella",
+    )
+
+    assert [task.id for task in completed_for_bella] == ["t1"]
+    assert [task.id for task in pending_for_bella] == ["t2"]
